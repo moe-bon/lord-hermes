@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "apexquant/config/service_manifest/v1",
+  "title": "ApexQuant Service Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "service_name",
+    "service_version",
+    "environment",
+    "plane",
+    "fail_closed_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "service_manifest/v1"
+    },
+    "service_name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$"
+    },
+    "service_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+    },
+    "environment": {
+      "enum": [
+        "local",
+        "sandbox",
+        "paper",
+        "shadow",
+        "production"
+      ]
+    },
+    "plane": {
+      "enum": [
+        "CONTROL",
+        "MARKET_DATA",
+        "TRADING",
+        "RISK",
+        "AI",
+        "DATA_RESEARCH",
+        "OBSERVABILITY"
+      ]
+    },
+    "fail_closed_policy": {
+      "enum": [
+        "READ_ONLY",
+        "CANCEL_OPEN_ORDERS",
+        "HALT_TRADING",
+        "SHUTDOWN"
+      ]
+    },
+    "live_trading_allowed": {
+      "type": "boolean",
+      "default": false
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "endpoints": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number"
+        ]
+      }
+    }
+  }
+}

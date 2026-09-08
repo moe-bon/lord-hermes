@@ -1,0 +1,47 @@
+services:
+  service-version-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.service-version-core
+    image: ${SERVICE_VERSION_CORE_IMAGE:-apexquant/service-version-core}:${SERVICE_VERSION_CORE_VERSION:-0.21.0}
+    environment:
+      APEX_SERVICE_VERSIONING_HTTP_ADDR: 0.0.0.0:8090
+      APEX_SERVICE_VERSIONING_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_SERVICE_VERSIONING_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_SERVICE_VERSIONING_MIGRATIONS_DIR: /migrations/postgres/service_versioning
+      APEX_SERVICE_VERSIONING_MIGRATE_ON_START: "true"
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: service-version-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.21"
+      apexquant.version: ${SERVICE_VERSION_CORE_VERSION:-0.21.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8090/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

@@ -1,0 +1,119 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ../../../../migrations/clickhouse/logging:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2G
+
+  loki:
+    image: grafana/loki:3.0.0
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ../../../monitoring/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ../../../monitoring/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - logs-data:/logs:ro
+    depends_on:
+      - loki
+    networks:
+      - observability
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  logging-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.logging-core
+    image: ${LOGGING_CORE_IMAGE:-apexquant/logging-core}:${LOGGING_CORE_VERSION:-0.14.0}
+    environment:
+      APEX_LOGGING_HTTP_ADDR: 0.0.0.0:8088
+      APEX_LOGGING_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_LOGGING_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_LOGGING_MIGRATIONS_DIR: /migrations/postgres/logging
+      APEX_LOGGING_CLICKHOUSE_URL: http://clickhouse:8123
+      APEX_LOGGING_CLICKHOUSE_DATABASE: logging
+      APEX_LOGGING_STDOUT_ENABLED: "true"
+      APEX_LOGGING_FILE_SINK_PATH: /logs/structured.log
+      APEX_LOGGING_STRICT_MODE: "false"
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - logs-data:/logs
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: logging-core
+      apexquant.service.plane: OBSERVABILITY
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.14"
+      apexquant.version: ${LOGGING_CORE_VERSION:-0.14.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+      - observability
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8088/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+volumes:
+  clickhouse-data:
+  loki-data:
+  logs-data:

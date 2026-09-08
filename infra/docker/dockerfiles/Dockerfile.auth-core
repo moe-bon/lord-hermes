@@ -1,0 +1,7 @@
+FROM python:3.13-slim
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace
+COPY python/apexquant-auth-core ./python/apexquant-auth-core
+RUN pip install --no-cache-dir ./python/apexquant-auth-core
+EXPOSE 8086
+CMD ["uvicorn", "apexquant_auth_core.app:app", "--host", "0.0.0.0", "--port", "8086"]

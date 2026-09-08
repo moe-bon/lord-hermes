@@ -1,0 +1,46 @@
+# ApexQuant Ultra — Feature Flag Determinism Spec
+# SINGLE SOURCE OF TRUTH for percentage-rollout bucketing.
+# Embedded verbatim into the Rust evaluator (include_str!) and the Python
+# SDK (packaged data). Any drift is a CI failure.
+version: 1
+
+hash:
+  algorithm: xxhash64
+  # Fixed seed. NEVER changes. Changing it re-buckets every rollout.
+  seed: 0x9E3779B97F4A7C15
+  encoding: utf-8
+
+bucketing:
+  # Rollout resolution is basis points (1/100 of a percent).
+  modulus: 10000
+  # The bucketing input is the flag key joined to ONE stable entity.
+  key_composition: "{flag_key}:{entity}"
+  # The bucketing entity is the FIRST present attribute in this order.
+  # Bucketing is per stable entity — NEVER per order or per request —
+  # so an entity never straddles a rollout boundary mid-flight.
+  entity_priority:
+    - strategy_id
+    - model_id
+    - account_id
+    - service
+    - principal
+
+rollout:
+  unit: basis_points
+  range: [0, 10000]
+
+evaluation:
+  # Precedence: denylist (deny) > allowlist (allow) > type dispatch.
+  precedence:
+    - denylist
+    - allowlist
+    - type
+  # Lifecycle / targeting short-circuits return the flag's fail_value.
+  fail_value_reasons:
+    - retired
+    - disabled
+    - draft
+    - environment_not_targeted
+    - expired
+    - missing_bucketing_entity
+    - snapshot_unavailable

@@ -1,0 +1,50 @@
+services:
+  disaster-recovery-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.disaster-recovery-core
+    image: ${DISASTER_RECOVERY_CORE_IMAGE:-apexquant/disaster-recovery-core}:${DISASTER_RECOVERY_CORE_VERSION:-0.25.0}
+    environment:
+      APEX_DR_HTTP_ADDR: 0.0.0.0:8094
+      APEX_DR_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_DR_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_DR_MIGRATIONS_DIR: /migrations/postgres/disaster_recovery
+      APEX_DR_MIGRATE_ON_START: "true"
+      APEX_DR_DEFAULT_BACKUP_POLICY_NAME: local-postgres
+      APEX_DR_ENABLE_HEALTH_CHECKS: "false"
+      APEX_DR_HEALTH_TIMEOUT_SECONDS: "2"
+    ports:
+      - "8094:8094"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: disaster-recovery-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.25"
+      apexquant.version: ${DISASTER_RECOVERY_CORE_VERSION:-0.25.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8094/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

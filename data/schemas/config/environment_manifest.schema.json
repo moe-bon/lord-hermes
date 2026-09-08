@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "apexquant/config/environment_manifest/v1",
+  "title": "ApexQuant Environment Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment",
+    "trading_mode",
+    "live_capital_allowed",
+    "fail_closed_default",
+    "infrastructure"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "environment_manifest/v1"
+    },
+    "environment": {
+      "enum": [
+        "local",
+        "sandbox",
+        "paper",
+        "shadow",
+        "production"
+      ]
+    },
+    "trading_mode": {
+      "enum": [
+        "DEVELOPMENT",
+        "SANDBOX",
+        "PAPER",
+        "SHADOW",
+        "PRODUCTION"
+      ]
+    },
+    "live_capital_allowed": {
+      "type": "boolean"
+    },
+    "fail_closed_default": {
+      "type": "boolean"
+    },
+    "observability_required": {
+      "type": "boolean",
+      "default": true
+    },
+    "infrastructure": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  }
+}

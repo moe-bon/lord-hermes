@@ -1,0 +1,18 @@
+[package]
+name = "apex-s3"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "apex_s3"
+path = "src/lib.rs"
+
+[dependencies]
+aws-config = { workspace = true }
+aws-sdk-s3 = { workspace = true }
+aws-types = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }

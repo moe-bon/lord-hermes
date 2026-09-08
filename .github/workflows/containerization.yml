@@ -1,0 +1,53 @@
+name: Containerization
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  container-policy:
+    name: Container Policy Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Verify containerization policy
+        run: ./scripts/container/verify.sh
+
+  docker-images:
+    name: Docker Image Builds
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build service framework image
+        run: |
+          docker build \
+            -f infra/docker/dockerfiles/Dockerfile.service-framework \
+            -t apexquant/service-framework-core:ci \
+            .
+
+      - name: Build repository verifier image
+        run: |
+          docker build \
+            -f infra/docker/dockerfiles/Dockerfile.repo-architecture-verifier \
+            -t apexquant/repo-architecture-verifier:ci \
+            .
+
+      - name: Build container policy verifier image
+        run: |
+          docker build \
+            -f infra/docker/dockerfiles/Dockerfile.container-policy-verifier \
+            -t apexquant/container-policy-verifier:ci \
+            .

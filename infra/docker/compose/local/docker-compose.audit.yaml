@@ -1,0 +1,50 @@
+services:
+  audit-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.audit-core
+    image: ${AUDIT_CORE_IMAGE:-apexquant/audit-core}:${AUDIT_CORE_VERSION:-0.13.0}
+    environment:
+      APEX_AUDIT_HTTP_ADDR: 0.0.0.0:8087
+      APEX_AUDIT_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_AUDIT_KAFKA_BOOTSTRAP_SERVERS: ${APEX_KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      APEX_AUDIT_TOPIC: platform.audit.event.v1
+      APEX_AUDIT_MIGRATIONS_DIR: /migrations/postgres/audit
+      APEX_AUDIT_INGEST_SHARED_SECRET: ${APEX_AUDIT_INGEST_SHARED_SECRET:-}
+    ports:
+      - "8087:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: audit-core
+      apexquant.service.plane: OBSERVABILITY
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.13"
+      apexquant.version: ${AUDIT_CORE_VERSION:-0.13.0}
+      apexquant.fail_closed_policy: SHUTDOWN
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8087/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M

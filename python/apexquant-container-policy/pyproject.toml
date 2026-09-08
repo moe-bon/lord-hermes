@@ -1,0 +1,35 @@
+[project]
+name = "apexquant-container-policy"
+version = "0.3.0"
+description = "ApexQuant Ultra Docker containerization policy verification"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.8",
+    "PyYAML>=6.0.1",
+    "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+apexquant-container-policy = "apexquant_container_policy.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apexquant_container_policy"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

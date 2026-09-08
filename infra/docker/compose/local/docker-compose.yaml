@@ -1,0 +1,267 @@
+name: ${COMPOSE_PROJECT_NAME:-apexquant-ultra}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-apexquant}
+      POSTGRES_USER: ${POSTGRES_USER:-apex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-apex}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apex} -d ${POSTGRES_DB:-apexquant}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.1
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - "0"
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --exit-when-healthy"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2G
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-apex}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-apexquant-minio}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+  service-framework-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.service-framework
+    image: ${SERVICE_FRAMEWORK_IMAGE:-apexquant/service-framework-core}:${SERVICE_FRAMEWORK_VERSION:-0.1.0}
+    environment:
+      APEX_HTTP_ADDR: 0.0.0.0:8080
+      APEX_GRPC_ADDR: 0.0.0.0:9090
+      APEX_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_TRADING_MODE: ${APEX_TRADING_MODE:-DEVELOPMENT}
+      APEX_LIVE_CAPITAL_ALLOWED: ${APEX_LIVE_CAPITAL_ALLOWED:-false}
+      APEX_FAIL_CLOSED_DEFAULT: ${APEX_FAIL_CLOSED_DEFAULT:-true}
+      APEX_SERVICE_NAME: service-framework-core
+      APEX_SERVICE_VERSION: ${SERVICE_FRAMEWORK_VERSION:-0.1.0}
+      APEX_MAX_DB_CONNECTIONS: "10"
+      APEX_HEARTBEAT_INTERVAL_SECS: "15"
+      RUST_LOG: info
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: service-framework-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.1"
+      apexquant.version: ${SERVICE_FRAMEWORK_VERSION:-0.1.0}
+      apexquant.fail_closed_policy: SHUTDOWN
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ../../../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+    depends_on:
+      - service-framework-core
+    networks:
+      - platform
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+  container-policy-verifier:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.container-policy-verifier
+    image: ${CONTAINER_POLICY_IMAGE:-apexquant/container-policy-verifier}:${CONTAINER_POLICY_VERSION:-0.3.0}
+    profiles:
+      - tools
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: container-policy-verifier
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.3"
+      apexquant.version: ${CONTAINER_POLICY_VERSION:-0.3.0}
+      apexquant.fail_closed_policy: READ_ONLY
+      apexquant.container.healthcheck_exempt: "true"
+    networks:
+      - platform
+    volumes:
+      - ../../../../:/workspace:ro
+    command:
+      - --compose
+      - /workspace/infra/docker/compose/local/docker-compose.yaml
+      - --json
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  env-config-verifier:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.env-config-verifier
+    image: ${ENV_CONFIG_IMAGE:-apexquant/env-config-verifier}:${ENV_CONFIG_VERSION:-0.4.0}
+    profiles:
+      - tools
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: env-config-verifier
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.4"
+      apexquant.version: ${ENV_CONFIG_VERSION:-0.4.0}
+      apexquant.fail_closed_policy: READ_ONLY
+      apexquant.container.healthcheck_exempt: "true"
+    networks:
+      - platform
+    volumes:
+      - ../../../../:/workspace:ro
+    command:
+      - --environments-root
+      - /workspace/infra/environments
+      - --all
+      - --json
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+networks:
+  platform:
+    name: apexquant-platform
+  data:
+    name: apexquant-data
+  observability:
+    name: apexquant-observability
+
+volumes:
+  postgres-data:
+  minio-data:

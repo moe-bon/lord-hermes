@@ -1,0 +1,43 @@
+environment: production
+display_name: Production Trading
+trading_mode: PRODUCTION
+live_capital_allowed: false
+fail_closed_default: true
+risk_enforcement_required: true
+ai_direct_execution_allowed: false
+observability_required: true
+
+networks:
+  platform: apexquant-platform
+  data: apexquant-data
+  observability: apexquant-observability
+
+services:
+  service_framework:
+    enabled: true
+    log_level: INFO
+    metrics_enabled: true
+
+infrastructure:
+  postgres:
+    host: ${PROD_POSTGRES_HOST}
+    port: 5432
+    database: apexquant_production
+    user: ${PROD_POSTGRES_USER}
+    password: ${PROD_POSTGRES_PASSWORD}
+    ssl_mode: verify-full
+
+  redis:
+    host: ${PROD_REDIS_HOST}
+    port: 6379
+    database_index: 0
+
+  kafka:
+    bootstrap_servers: ${PROD_KAFKA_BOOTSTRAP_SERVERS}
+    security_protocol: SASL_SSL
+
+  object_storage:
+    endpoint: ${PROD_OBJECT_STORAGE_ENDPOINT}
+    access_key: ${PROD_OBJECT_STORAGE_ACCESS_KEY}
+    secret_key: ${PROD_OBJECT_STORAGE_SECRET_KEY}
+    secure: true

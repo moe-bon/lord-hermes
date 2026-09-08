@@ -1,0 +1,77 @@
+services:
+  migration-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.migration-core
+    image: ${MIGRATION_CORE_IMAGE:-apexquant/migration-core}:${MIGRATION_CORE_VERSION:-0.20.0}
+    profiles:
+      - tools
+    environment:
+      APEX_POSTGRES_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_CLICKHOUSE_URL: ${APEX_CLICKHOUSE_URL:-http://clickhouse:8123}
+    volumes:
+      - ../../../../:/workspace
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: migration-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.20"
+      apexquant.version: ${MIGRATION_CORE_VERSION:-0.20.0}
+      apexquant.fail_closed_policy: READ_ONLY
+      apexquant.container.healthcheck_exempt: "true"
+    networks:
+      - platform
+      - data
+    command:
+      - status
+      - --engine
+      - postgres
+      - --root
+      - /workspace/migrations/postgres
+      - --database-url
+      - postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  md-control-plane:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.market-data-registry
+    image: apexquant/md-control-plane:1.2.0
+    environment:
+      APEX_MARKET_DATA_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+    ports:
+      - "8095:8095"
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [platform, data]
+
+  md-ingest-fleet:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.md-ingest
+    image: apexquant/md-ingest-fleet:1.2.0
+    environment:
+      APEX_REDPANDA_BROKERS: redpanda:9092
+      APEX_POSTGRES_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+    depends_on:
+      redpanda: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    networks: [platform, data]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G

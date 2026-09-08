@@ -1,0 +1,43 @@
+environment: local
+display_name: Local Development
+trading_mode: DEVELOPMENT
+live_capital_allowed: false
+fail_closed_default: true
+risk_enforcement_required: true
+ai_direct_execution_allowed: false
+observability_required: true
+
+networks:
+  platform: apexquant-platform
+  data: apexquant-data
+  observability: apexquant-observability
+
+services:
+  service_framework:
+    enabled: true
+    log_level: INFO
+    metrics_enabled: true
+
+infrastructure:
+  postgres:
+    host: postgres
+    port: 5432
+    database: apexquant
+    user: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    ssl_mode: disable
+
+  redis:
+    host: redis
+    port: 6379
+    database_index: 0
+
+  kafka:
+    bootstrap_servers: redpanda:9092
+    security_protocol: PLAINTEXT
+
+  object_storage:
+    endpoint: http://minio:9000
+    access_key: ${MINIO_ROOT_USER}
+    secret_key: ${MINIO_ROOT_PASSWORD}
+    secure: false

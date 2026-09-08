@@ -1,0 +1,51 @@
+services:
+  api-gateway:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.api-gateway
+    image: ${API_GATEWAY_IMAGE:-apexquant/api-gateway}:${API_GATEWAY_VERSION:-0.10.0}
+    environment:
+      APEX_HTTP_ADDR: 0.0.0.0:8085
+      APEX_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_GATEWAY_UPSTREAMS: "service-framework-core|CONTROL|http://service-framework-core:8080;database-infrastructure-core|CONTROL|http://database-infrastructure-core:8081"
+      APEX_GATEWAY_MAX_BODY_BYTES: "10485760"
+      APEX_GATEWAY_REQUEST_TIMEOUT_SECS: "5"
+      RUST_LOG: info
+    ports:
+      - "8085:8085"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      service-framework-core:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: api-gateway
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.10"
+      apexquant.version: ${API_GATEWAY_VERSION:-0.10.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8085/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M

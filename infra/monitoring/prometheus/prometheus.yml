@@ -1,0 +1,60 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: apexquant-local
+    environment: local
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: apexquant-api-gateway
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api-gateway:8085"]
+        labels:
+          service: api-gateway
+          plane: CONTROL
+
+  - job_name: apexquant-auth-core
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["auth-core:8086"]
+        labels:
+          service: auth-core
+          plane: CONTROL
+
+  - job_name: apexquant-audit-core
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["audit-core:8087"]
+        labels:
+          service: audit-core
+          plane: OBSERVABILITY
+
+  - job_name: apexquant-logging-core
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["logging-core:8088"]
+        labels:
+          service: logging-core
+          plane: OBSERVABILITY
+
+  - job_name: apexquant-database-infrastructure
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["database-infrastructure-core:8081"]
+        labels:
+          service: database-infrastructure-core
+          plane: CONTROL

@@ -1,0 +1,59 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/common/apex-auth",
+    "crates/common/apex-config",
+    "crates/common/apex-events",
+    "crates/common/apex-redis",
+    "crates/common/apex-s3",
+    "crates/common/apex-secrets",
+    "crates/control/service-framework-core",
+    "crates/control/database-infrastructure-core",
+    "crates/control/api-gateway-core",
+    "crates/common/apex-auth",
+    "crates/common/apex-config-validation",
+    "crates/common/apex-flag-engine",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "Proprietary"
+
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+tonic = "0.12"
+tonic-build = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "chrono",
+    "json",
+    "migrate",
+] }
+axum = "0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+thiserror = "1"
+anyhow = "1"
+prometheus = "0.13"
+chrono = { version = "0.4", features = ["serde"] }
+redis = { version = "0.25", features = ["tokio-comp", "script", "connection-manager"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+aws-config = "1.5"
+aws-sdk-s3 = "1.49"
+aws-types = "1.3"
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
+url = "2"
+bytes = "1"
+base64 = "0.22"
+hmac = "0.12"
+sha2 = "0.10"

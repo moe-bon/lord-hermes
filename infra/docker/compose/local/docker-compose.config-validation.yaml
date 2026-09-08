@@ -1,0 +1,47 @@
+services:
+  config-validation-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.config-validation-core
+    image: ${CONFIG_VALIDATION_CORE_IMAGE:-apexquant/config-validation-core}:${CONFIG_VALIDATION_CORE_VERSION:-0.23.0}
+    environment:
+      APEX_CONFIG_VALIDATION_HTTP_ADDR: 0.0.0.0:8092
+      APEX_CONFIG_VALIDATION_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_CONFIG_VALIDATION_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_CONFIG_VALIDATION_MIGRATIONS_DIR: /migrations/postgres/config_validation
+      APEX_CONFIG_VALIDATION_MIGRATE_ON_START: "true"
+    ports:
+      - "8092:8092"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: config-validation-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.23"
+      apexquant.version: ${CONFIG_VALIDATION_CORE_VERSION:-0.23.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8092/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

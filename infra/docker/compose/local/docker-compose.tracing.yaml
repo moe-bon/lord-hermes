@@ -1,0 +1,81 @@
+services:
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: -config.file=/etc/tempo/tempo.yaml
+    volumes:
+      - ../../../monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - observability
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3200/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  tracing-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.tracing-core
+    image: ${TRACING_CORE_IMAGE:-apexquant/tracing-core}:${TRACING_CORE_VERSION:-0.16.0}
+    environment:
+      APEX_TRACING_HTTP_ADDR: 0.0.0.0:8089
+      APEX_TRACING_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_TRACING_SERVICE_NAME: tracing-core
+      APEX_TRACING_PLANE: OBSERVABILITY
+      APEX_TRACING_SERVICE_VERSION: ${TRACING_CORE_VERSION:-0.16.0}
+      APEX_TRACING_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_TRACING_MIGRATIONS_DIR: /migrations/postgres/tracing
+      APEX_TRACING_OTLP_ENDPOINT: http://tempo:4318
+      APEX_TRACING_TEMPO_QUERY_ENDPOINT: http://tempo:3200
+      APEX_TRACING_SAMPLE_RATIO: "1.0"
+    ports:
+      - "8089:8089"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: tracing-core
+      apexquant.service.plane: OBSERVABILITY
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.16"
+      apexquant.version: ${TRACING_CORE_VERSION:-0.16.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+      - observability
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8089/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+volumes:
+  tempo-data:

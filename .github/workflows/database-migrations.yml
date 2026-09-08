@@ -1,0 +1,95 @@
+name: Database Migration Framework
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-migrations/**'
+      - 'migrations/**'
+      - '.github/workflows/database-migrations.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-migrations/**'
+      - 'migrations/**'
+      - '.github/workflows/database-migrations.yml'
+
+jobs:
+  migration-tests:
+    name: Migration Framework Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run migration framework tests
+        run: |
+          cd python/apexquant-migrations
+          uv sync --all-extras
+          uv run pytest --tb=short -q
+
+  postgres-migration-integration:
+    name: PostgreSQL Migration Integration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install migration framework
+        run: |
+          cd python/apexquant-migrations
+          uv sync --all-extras
+
+      - name: Apply schema_migrations domain
+        run: |
+          cd python/apexquant-migrations
+          uv run apexquant-migrate apply \
+            --engine postgres \
+            --root ../../migrations/postgres \
+            --domain schema_migrations \
+            --database-url postgres://postgres:postgres@localhost:5432/postgres \
+            --yes
+
+      - name: Verify schema_migrations domain
+        run: |
+          cd python/apexquant-migrations
+          uv run apexquant-migrate verify \
+            --engine postgres \
+            --root ../../migrations/postgres \
+            --domain schema_migrations \
+            --database-url postgres://postgres:postgres@localhost:5432/postgres
+
+      - name: Re-apply should be idempotent
+        run: |
+          cd python/apexquant-migrations
+          uv run apexquant-migrate apply \
+            --engine postgres \
+            --root ../../migrations/postgres \
+            --domain schema_migrations \
+            --database-url postgres://postgres:postgres@localhost:5432/postgres \
+            --yes

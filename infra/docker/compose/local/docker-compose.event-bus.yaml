@@ -1,0 +1,42 @@
+services:
+  event-bus-verifier:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.event-bus-verifier
+    image: ${EVENT_BUS_IMAGE:-apexquant/event-bus-verifier}:${EVENT_BUS_VERSION:-0.8.0}
+    profiles:
+      - tools
+    environment:
+      APEX_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_KAFKA_BOOTSTRAP_SERVERS: ${APEX_KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: event-bus-verifier
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.8"
+      apexquant.version: ${EVENT_BUS_VERSION:-0.8.0}
+      apexquant.fail_closed_policy: READ_ONLY
+      apexquant.container.healthcheck_exempt: "true"
+    networks:
+      - platform
+      - data
+    command:
+      - bootstrap
+      - --bootstrap-servers
+      - ${APEX_KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+      - --environment
+      - ${APEX_ENVIRONMENT:-local}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

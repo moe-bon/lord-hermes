@@ -1,0 +1,38 @@
+services:
+  test-runner:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.test-runner
+    image: ${TEST_RUNNER_IMAGE:-apexquant/test-runner}:${TEST_RUNNER_VERSION:-0.19.0}
+    profiles:
+      - tools
+    environment:
+      APEX_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+    volumes:
+      - ../../../../:/workspace
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: test-runner
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.19"
+      apexquant.version: ${TEST_RUNNER_VERSION:-0.19.0}
+      apexquant.fail_closed_policy: READ_ONLY
+      apexquant.container.healthcheck_exempt: "true"
+    networks:
+      - platform
+    command:
+      - list-failure-modes
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M

@@ -1,0 +1,38 @@
+title = "ApexQuant Ultra Gitleaks Configuration"
+
+[allowlist]
+    paths = [
+        '''\.env\.example$''',
+        '''test.*\.py$''',
+        '''conftest\.py$''',
+    ]
+    regexes = [
+        '''example''',
+        '''placeholder''',
+        '''dummy''',
+    ]
+
+[[rules]]
+    id = "broker-api-key"
+    description = "Broker API Key"
+    regex = '''(?i)(broker|exchange|trading)[_-]?(api)?[_-]?key\s*[=:]\s*['"][a-zA-Z0-9_\-]{16,}['"]'''
+
+[[rules]]
+    id = "broker-secret"
+    description = "Broker API Secret"
+    regex = '''(?i)(broker|exchange|trading)[_-]?(api)?[_-]?secret\s*[=:]\s*['"][a-zA-Z0-9_\-]{16,}['"]'''
+
+[[rules]]
+    id = "database-url"
+    description = "Database Connection String"
+    regex = '''(?i)(postgres|postgresql|mysql|mongodb)://[a-zA-Z0-9_\-]+:[a-zA-Z0-9_\-]+@'''
+
+[[rules]]
+    id = "jwt-secret"
+    description = "JWT Secret"
+    regex = '''(?i)jwt[_-]?secret\s*[=:]\s*['"][a-zA-Z0-9_\-]{16,}['"]'''
+
+[[rules]]
+    id = "encryption-key"
+    description = "Encryption Key"
+    regex = '''(?i)(encryption|aes|cipher)[_-]?key\s*[=:]\s*['"][a-zA-Z0-9_\-+/=]{16,}['"]'''

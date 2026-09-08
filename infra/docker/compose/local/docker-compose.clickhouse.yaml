@@ -1,0 +1,23 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    ports:
+      - "8123:8123"
+      - "19000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2G
+
+volumes:
+  clickhouse-data:

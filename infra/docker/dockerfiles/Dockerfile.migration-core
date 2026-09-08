@@ -1,0 +1,18 @@
+FROM python:3.13-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && useradd --create-home --uid 10001 apex \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY python/apexquant-migrations ./python/apexquant-migrations
+
+RUN pip install --no-cache-dir ./python/apexquant-migrations
+
+USER 10001
+
+ENTRYPOINT ["apexquant-migrate"]
+
+CMD ["--help"]

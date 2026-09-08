@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "description": "Shared Rust<->Python conformance vectors for flag evaluation.",
+  "vectors": [
+    {
+      "flag_key": "live_trading_enabled",
+      "status": "ACTIVE",
+      "flag_type": "BOOLEAN",
+      "flag_class": "SAFETY_CRITICAL",
+      "bool_value": true,
+      "rollout_bps": 0,
+      "allowlist": [],
+      "denylist": [],
+      "environments": [],
+      "fail_value": false,
+      "expires_at_epoch_ms": null,
+      "context": {
+        "environment": "production",
+        "attributes": [["service", "exec-core"], ["strategy_id", "strat-1"]]
+      },
+      "now_epoch_ms": 1000,
+      "expected_enabled": true,
+      "expected_reason": "enabled"
+    },
+    {
+      "flag_key": "live_trading_enabled",
+      "status": "RETIRED",
+      "flag_type": "BOOLEAN",
+      "flag_class": "SAFETY_CRITICAL",
+      "bool_value": true,
+      "rollout_bps": 0,
+      "allowlist": [],
+      "denylist": [],
+      "environments": [],
+      "fail_value": false,
+      "expires_at_epoch_ms": null,
+      "context": {
+        "environment": "production",
+        "attributes": [["service", "exec-core"]]
+      },
+      "now_epoch_ms": 1000,
+      "expected_enabled": false,
+      "expected_reason": "retired"
+    },
+    {
+      "flag_key": "exp.new_router",
+      "status": "ACTIVE",
+      "flag_type": "PERCENTAGE",
+      "flag_class": "STANDARD",
+      "bool_value": false,
+      "rollout_bps": 5000,
+      "allowlist": ["strat-allow"],
+      "denylist": ["strat-deny"],
+      "environments": ["paper", "production"],
+      "fail_value": false,
+      "expires_at_epoch_ms": null,
+      "context": {
+        "environment": "production",
+        "attributes": [["strategy_id", "strat-deny"]]
+      },
+      "now_epoch_ms": 1000,
+      "expected_enabled": false,
+      "expected_reason": "denylisted"
+    },
+    {
+      "flag_key": "exp.new_router",
+      "status": "ACTIVE",
+      "flag_type": "PERCENTAGE",
+      "flag_class": "STANDARD",
+      "bool_value": false,
+      "rollout_bps": 5000,
+      "allowlist": ["strat-allow"],
+      "denylist": ["strat-deny"],
+      "environments": ["paper", "production"],
+      "fail_value": false,
+      "expires_at_epoch_ms": null,
+      "context": {
+        "environment": "production",
+        "attributes": [["strategy_id", "strat-allow"]]
+      },
+      "now_epoch_ms": 1000,
+      "expected_enabled": true,
+      "expected_reason": "allowlisted"
+    },
+    {
+      "flag_key": "exp.new_router",
+      "status": "ACTIVE",
+      "flag_type": "PERCENTAGE",
+      "flag_class": "STANDARD",
+      "bool_value": false,
+      "rollout_bps": 5000,
+      "allowlist": [],
+      "denylist": [],
+      "environments": ["paper"],
+      "fail_value": false,
+      "expires_at_epoch_ms": null,
+      "context": {
+        "environment": "production",
+        "attributes": [["strategy_id", "strat-9"]]
+      },
+      "now_epoch_ms": 1000,
+      "expected_enabled": false,
+      "expected_reason": "environment_not_targeted"
+    }
+  ]
+}

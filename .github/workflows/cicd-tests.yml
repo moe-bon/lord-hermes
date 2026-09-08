@@ -1,0 +1,40 @@
+name: CI/CD Pipeline Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'Makefile'
+      - 'scripts/deploy/**'
+      - '.gitleaks.toml'
+      - '.semgrep.yml'
+      - 'tests/integration/test_cicd_pipeline.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'Makefile'
+      - 'scripts/deploy/**'
+
+jobs:
+  pipeline-tests:
+    name: Pipeline Configuration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run pipeline tests
+        run: |
+          cd tests/integration
+          uv sync --all-extras
+          uv run pytest test_cicd_pipeline.py --tb=short -q
+
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:latest
+        with:
+          args: -color

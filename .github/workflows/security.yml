@@ -1,0 +1,111 @@
+name: Security Pipeline
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6 AM UTC
+  push:
+    branches: [main]
+    paths:
+      - '**/pyproject.toml'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/requirements*.txt'
+  workflow_dispatch:
+
+jobs:
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Python dependency audit
+        run: |
+          FAILED=0
+          for pkg_dir in python/*/; do
+            if [ -f "$pkg_dir/pyproject.toml" ]; then
+              echo "=== Auditing $pkg_dir ==="
+              cd "$pkg_dir"
+              uv sync --all-extras 2>/dev/null || true
+              uv run pip-audit --skip-editable --strict || FAILED=1
+              cd -
+            fi
+          done
+          exit $FAILED
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Rust dependency audit
+        run: cargo audit
+
+  container-scan:
+    name: Container Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - service-framework-core
+          - api-gateway
+          - auth-core
+          - audit-core
+          - logging-core
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: '1'
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run custom secret patterns
+        run: |
+          echo "Scanning for hardcoded credentials..."
+          grep -rn "password\s*=\s*['\"][^'\"]+['\"]" --include="*.py" --include="*.rs" --include="*.toml" . || true
+          grep -rn "api_key\s*=\s*['\"][^'\"]+['\"]" --include="*.py" --include="*.rs" --include="*.toml" . || true
+          echo "Secret scan complete"
+
+  sbom-generation:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM for Python packages
+        uses: anchore/sbom-action@v0
+        with:
+          path: python/
+          format: spdx-json
+          output-file: sbom-python.spdx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: sbom-*.spdx.json
+          retention-days: 365

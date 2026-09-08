@@ -1,0 +1,19 @@
+schema_version: service_manifest/v1
+
+service_name: service-framework-core
+service_version: 0.1.0
+environment: local
+plane: CONTROL
+fail_closed_policy: SHUTDOWN
+live_trading_allowed: false
+
+dependencies:
+  - postgres
+
+endpoints:
+  http: http://service-framework-core:8080
+  grpc: grpc://service-framework-core:9090
+
+resources:
+  cpus: "1.0"
+  memory: 512M

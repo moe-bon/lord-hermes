@@ -1,0 +1,55 @@
+name: Configuration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  environment-validation:
+    name: Environment Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Validate all environments
+        run: ./scripts/config/validate-all.sh
+
+  rust-config-tests:
+    name: Rust Configuration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Run apex-config tests
+        run: cargo test --package apex-config
+
+  python-config-tests:
+    name: Python Configuration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run Python environment-config tests
+        run: |
+          cd python/apexquant-env-config
+          uv sync --all-extras
+          uv run pytest

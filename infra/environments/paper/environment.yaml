@@ -1,0 +1,43 @@
+environment: paper
+display_name: Paper Trading
+trading_mode: PAPER
+live_capital_allowed: false
+fail_closed_default: true
+risk_enforcement_required: true
+ai_direct_execution_allowed: false
+observability_required: true
+
+networks:
+  platform: apexquant-platform
+  data: apexquant-data
+  observability: apexquant-observability
+
+services:
+  service_framework:
+    enabled: true
+    log_level: INFO
+    metrics_enabled: true
+
+infrastructure:
+  postgres:
+    host: postgres.paper.apexquant.internal
+    port: 5432
+    database: apexquant_paper
+    user: ${PAPER_POSTGRES_USER}
+    password: ${PAPER_POSTGRES_PASSWORD}
+    ssl_mode: require
+
+  redis:
+    host: redis.paper.apexquant.internal
+    port: 6379
+    database_index: 0
+
+  kafka:
+    bootstrap_servers: redpanda.paper.apexquant.internal:9092
+    security_protocol: SASL_SSL
+
+  object_storage:
+    endpoint: https://minio.paper.apexquant.internal
+    access_key: ${PAPER_MINIO_ACCESS_KEY}
+    secret_key: ${PAPER_MINIO_SECRET_KEY}
+    secure: true

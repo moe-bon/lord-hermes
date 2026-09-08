@@ -1,0 +1,18 @@
+FROM python:3.13-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && useradd --create-home --uid 10001 apex \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY python/apexquant-container-policy ./python/apexquant-container-policy
+
+RUN pip install --no-cache-dir ./python/apexquant-container-policy
+
+USER 10001
+
+ENTRYPOINT ["apexquant-container-policy"]
+
+CMD ["--help"]

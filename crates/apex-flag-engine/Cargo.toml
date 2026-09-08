@@ -1,0 +1,22 @@
+[package]
+name = "apex-flag-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "apex_flag_engine"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+arc-swap = "1.7"
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+redis = { workspace = true }
+
+[dev-dependencies]
+rand = "0.8"

@@ -1,0 +1,37 @@
+FROM rust:1.81-bookworm AS builder
+
+ARG SERVICE_PACKAGE
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY Cargo.toml rust-toolchain.toml ./
+COPY crates ./crates
+COPY proto ./proto
+COPY migrations ./migrations
+
+RUN cargo build --release --package ${SERVICE_PACKAGE}
+
+FROM debian:bookworm-slim
+
+ARG SERVICE_PACKAGE
+ARG SERVICE_BIN=${SERVICE_PACKAGE}
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl tzdata \
+    && useradd --create-home --uid 10001 apex \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /workspace/target/release/${SERVICE_BIN} /usr/local/bin/apexquant-service
+
+USER 10001
+
+ENV APEX_HEALTH_PORT=8080
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=20 \
+    CMD curl -sf "http://127.0.0.1:${APEX_HEALTH_PORT}/healthz" || exit 1
+
+ENTRYPOINT ["/usr/local/bin/apexquant-service"]

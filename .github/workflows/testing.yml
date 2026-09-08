@@ -1,0 +1,76 @@
+name: Automated Testing Framework
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-testing/**'
+      - 'crates/common/apex-testkit/**'
+      - '.github/workflows/testing.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-testing/**'
+      - 'crates/common/apex-testkit/**'
+      - '.github/workflows/testing.yml'
+
+jobs:
+  python-testing-framework:
+    name: Python Testing Framework Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run framework tests
+        run: |
+          cd python/apexquant-testing
+          uv sync --all-extras
+          uv run pytest --tb=short -q
+
+  rust-testkit:
+    name: Rust TestKit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Run apex-testkit tests
+        run: cargo test --package apex-testkit
+
+  self-run:
+    name: Test Runner Self-Execution
+    runs-on: ubuntu-latest
+    needs: python-testing-framework
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install test runner
+        run: |
+          cd python/apexquant-testing
+          uv sync --all-extras
+
+      - name: Run test runner against itself
+        run: |
+          cd python/apexquant-testing
+          uv run apexquant-test-runner run \
+            --root ../.. \
+            --package . \
+            --output-dir ../../test-results \
+            --environment ci \
+            --trigger github-actions

@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.sql text
+*.proto text
+*.rs text
+*.py text
+*.toml text
+*.yaml text
+*.yml text
+*.md text
+*.sh text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp4 binary
+*.pdf binary

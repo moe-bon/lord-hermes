@@ -1,0 +1,17 @@
+[package]
+name = "apex-audit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "apex_audit"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+hex = "0.4"
+thiserror = { workspace = true }

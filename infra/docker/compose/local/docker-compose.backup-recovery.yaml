@@ -1,0 +1,57 @@
+services:
+  backup-recovery-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.backup-recovery-core
+    image: ${BACKUP_RECOVERY_CORE_IMAGE:-apexquant/backup-recovery-core}:${BACKUP_RECOVERY_CORE_VERSION:-0.24.0}
+    environment:
+      APEX_BACKUP_HTTP_ADDR: 0.0.0.0:8093
+      APEX_BACKUP_ENVIRONMENT: ${APEX_ENVIRONMENT:-local}
+      APEX_BACKUP_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_BACKUP_MIGRATIONS_DIR: /migrations/postgres/backup_recovery
+      APEX_BACKUP_MIGRATE_ON_START: "true"
+      APEX_BACKUP_WORKDIR: /tmp/apexquant-backups
+      APEX_BACKUP_STORAGE_ROOT: /backups
+      APEX_BACKUP_STORAGE_DRIVER: local
+      APEX_BACKUP_DEFAULT_BUCKET: apexquant-backups
+      APEX_BACKUP_POSTGRES_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+    ports:
+      - "8093:8093"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - backups-data:/backups
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: backup-recovery-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.24"
+      apexquant.version: ${BACKUP_RECOVERY_CORE_VERSION:-0.24.0}
+      apexquant.fail_closed_policy: READ_ONLY
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8093/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+volumes:
+  backups-data:

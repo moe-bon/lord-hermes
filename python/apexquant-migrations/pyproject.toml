@@ -1,0 +1,35 @@
+[project]
+name = "apexquant-migrations"
+version = "0.20.0"
+description = "ApexQuant Ultra database migration framework"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.8",
+    "psycopg[binary]>=3.2",
+    "clickhouse-connect>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+apexquant-migrate = "apexquant_migrations.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apexquant_migrations"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

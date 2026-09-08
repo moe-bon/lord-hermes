@@ -1,0 +1,23 @@
+{
+  "evaluate": [
+    {"name":"healthy_ai","plane":"AI","has_roles":true,"permissions":["model:read","feature:read"],"expected_status":"GRANTED"},
+    {"name":"roleless_suppressed","plane":"AI","has_roles":false,"permissions":["model:read"],"expected_status":"UNPROVISIONED"},
+    {"name":"ai_forbidden_execution_write","plane":"AI","has_roles":true,"permissions":["model:read","execution:write"],"expected_status":"INVARIANT_VIOLATION"},
+    {"name":"ai_forbidden_broker_resource","plane":"AI","has_roles":true,"permissions":["broker:credentials:read"],"expected_status":"INVARIANT_VIOLATION"},
+    {"name":"ai_global_wildcard","plane":"AI","has_roles":true,"permissions":["*"],"expected_status":"INVARIANT_VIOLATION"},
+    {"name":"data_research_forbidden","plane":"DATA_RESEARCH","has_roles":true,"permissions":["execution:submit"],"expected_status":"INVARIANT_VIOLATION"},
+    {"name":"trading_execution_ok","plane":"TRADING","has_roles":true,"permissions":["execution:submit","execution:read"],"expected_status":"GRANTED"},
+    {"name":"risk_routine_kill_switch_ok","plane":"RISK","has_roles":true,"permissions":["kill_switch:routine"],"expected_status":"GRANTED"}
+  ],
+  "authorize": [
+    {"name":"deny_overrides_ai_execution","plane":"AI","granted":["execution:*"],"request":"execution:submit","expected_allow":false},
+    {"name":"deny_overrides_ai_broker","plane":"AI","granted":["broker:*"],"request":"broker:credentials:read","expected_allow":false},
+    {"name":"ai_model_read_allowed","plane":"AI","granted":["model:read"],"request":"model:read","expected_allow":true},
+    {"name":"ai_kill_switch_denied","plane":"AI","granted":["kill_switch:*"],"request":"kill_switch:routine","expected_allow":false},
+    {"name":"trading_execution_allowed","plane":"TRADING","granted":["execution:submit"],"request":"execution:submit","expected_allow":true},
+    {"name":"wildcard_action_covers_resource","plane":"TRADING","granted":["execution:*"],"request":"execution:modify:OMS-1","expected_allow":true},
+    {"name":"specific_does_not_cover_broader","plane":"TRADING","granted":["execution:modify:OMS-1"],"request":"execution:modify","expected_allow":false},
+    {"name":"global_wildcard_control_plane","plane":"CONTROL","granted":["*"],"request":"system:config:write","expected_allow":true},
+    {"name":"default_deny","plane":"TRADING","granted":["execution:read"],"request":"execution:submit","expected_allow":false}
+  ]
+}

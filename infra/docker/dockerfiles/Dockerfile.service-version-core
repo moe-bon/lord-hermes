@@ -1,0 +1,24 @@
+FROM python:3.13-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && useradd --create-home --uid 10001 apex \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY python/apexquant-service-versioning ./python/apexquant-service-versioning
+COPY migrations/postgres/service_versioning /migrations/postgres/service_versioning
+
+RUN pip install --no-cache-dir ./python/apexquant-service-versioning
+
+USER 10001
+
+EXPOSE 8090
+
+ENV APEX_HEALTH_PORT=8090
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=15s --retries=20 \
+    CMD curl -sf "http://127.0.0.1:${APEX_HEALTH_PORT}/healthz" || exit 1
+
+ENTRYPOINT ["apexquant-service-versioning", "serve"]

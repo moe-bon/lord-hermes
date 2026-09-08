@@ -1,0 +1,41 @@
+# ApexQuant Ultra — RBAC Security Invariant
+# SINGLE SOURCE OF TRUTH. Embedded verbatim into the Rust evaluator
+# (include_str!) and the Python evaluator (packaged data).
+# Any drift between the compiled-in copies is a CI failure.
+version: 1
+
+grammar:
+  format: "domain:action[:resource]"
+  wildcard: "full_segment_only"      # '*' is valid only as an entire segment
+  segment_charset: "a-z0-9_-"
+  segments: [2, 3]                    # min/max segments for non-global permissions
+  global_wildcard: "*"
+
+# The AI-cannot-execute invariant, expressed in the permission grammar.
+forbidden:
+  AI:
+    - "broker:*"
+    - "execution:*"
+    - "kill_switch:*"
+  DATA_RESEARCH:
+    - "broker:*"
+    - "execution:*"
+    - "kill_switch:*"
+
+restricted_planes:
+  - AI
+  - DATA_RESEARCH
+
+reserved:
+  global_wildcard:
+    permission: "*"
+    assignable_to_roles: ["SUPER_ADMIN"]
+    never_in_planes: ["AI", "DATA_RESEARCH"]
+
+# Emergency stop is OUT-OF-BAND of RBAC (Engineering Contract #15).
+# It is never expressed as an RBAC permission.
+carve_outs:
+  emergency_stop:
+    rbac_governed: false
+    channel: "MTLS_OR_CONSOLE"
+    note: "Routine kill-switch uses kill_switch:* via RBAC; emergency global stop is exempt."

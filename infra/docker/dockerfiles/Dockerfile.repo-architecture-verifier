@@ -1,0 +1,9 @@
+FROM python:3.13-slim
+
+WORKDIR /workspace
+
+COPY python/apexquant-repo-architecture ./python/apexquant-repo-architecture
+
+RUN pip install --no-cache-dir ./python/apexquant-repo-architecture
+
+ENTRYPOINT ["apexquant-repo-verify"]

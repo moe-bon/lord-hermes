@@ -1,0 +1,35 @@
+name: Backup & Recovery
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-backup-recovery/**'
+      - 'migrations/postgres/backup_recovery/**'
+      - '.github/workflows/backup-recovery.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'python/apexquant-backup-recovery/**'
+      - 'migrations/postgres/backup_recovery/**'
+      - '.github/workflows/backup-recovery.yml'
+
+jobs:
+  backup-recovery-tests:
+    name: Backup & Recovery Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run backup recovery tests
+        run: |
+          cd python/apexquant-backup-recovery
+          uv sync --all-extras
+          uv run pytest --tb=short -q

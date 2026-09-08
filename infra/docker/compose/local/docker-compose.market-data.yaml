@@ -1,0 +1,27 @@
+services:
+  md-registry:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.md-registry
+    image: apexquant/md-registry:1.1.0
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apexquantpostgres123}@postgres:5432/${POSTGRES_DB:-apexquant}
+      RUST_LOG: apex_md_registry=info,tower_http=info
+    ports:
+      - "8095:8095"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8095/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 512M

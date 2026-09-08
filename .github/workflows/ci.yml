@@ -1,0 +1,475 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/apexquant
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Stage 1: Detect Changed Services
+  # ─────────────────────────────────────────────────────────────
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      python-services: ${{ steps.filter.outputs.python-services }}
+      rust-services: ${{ steps.filter.outputs.rust-services }}
+      infra-changed: ${{ steps.filter.outputs.infra }}
+      any-changed: ${{ steps.filter.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            python-services:
+              - 'python/**'
+              - 'services/**'
+            rust-services:
+              - 'crates/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            infra:
+              - 'infra/**'
+              - 'migrations/**'
+            any:
+              - '**'
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 2: Python Lint, Type Check, Unit Tests
+  # ─────────────────────────────────────────────────────────────
+  python-ci:
+    name: Python CI
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python-services == 'true' || needs.detect-changes.outputs.any == 'true'
+
+    strategy:
+      matrix:
+        python-version: ["3.13"]
+        package-dir:
+          - python/apexquant-service-framework
+          - python/apexquant-repo-architecture
+          - python/apexquant-container-policy
+          - python/apexquant-env-config
+          - python/apexquant-secrets
+          - python/apexquant-redis
+          - python/apexquant-event-bus
+          - python/apexquant-s3
+          - python/apexquant-api-gateway
+          - python/apexquant-auth
+          - python/apexquant-rbac
+          - python/apexquant-audit
+          - python/apexquant-logging
+          - python/apexquant-metrics
+          - python/apexquant-tracing
+          - python/apexquant-health
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ matrix.package-dir }}/.venv
+            ~/.cache/uv
+          key: ${{ runner.os }}-python-${{ matrix.python-version }}-${{ hashFiles(format('{0}/pyproject.toml', matrix.package-dir)) }}
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.package-dir }}
+        run: uv sync --all-extras
+
+      - name: Lint with Ruff
+        working-directory: ${{ matrix.package-dir }}
+        run: uv run ruff check .
+
+      - name: Format check with Ruff
+        working-directory: ${{ matrix.package-dir }}
+        run: uv run ruff format --check .
+
+      - name: Type check with mypy
+        working-directory: ${{ matrix.package-dir }}
+        run: uv run mypy .
+        continue-on-error: false
+
+      - name: Run unit tests
+        working-directory: ${{ matrix.package-dir }}
+        run: uv run pytest --tb=short -q --junitxml=../../test-results/${{ matrix.package-dir }}-unit.xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: test-results/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 3: Rust Lint, Clippy, Unit Tests
+  # ─────────────────────────────────────────────────────────────
+  rust-ci:
+    name: Rust CI
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.rust-services == 'true' || needs.detect-changes.outputs.any == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run unit tests
+        run: cargo test --workspace --lib
+
+      - name: Run integration tests
+        run: cargo test --workspace --tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+        continue-on-error: true
+
+      - name: Build release binaries
+        run: cargo build --release --workspace
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 4: Security Scanning
+  # ─────────────────────────────────────────────────────────────
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.any == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run pip-audit on Python packages
+        run: |
+          for pkg_dir in python/*/; do
+            if [ -f "$pkg_dir/pyproject.toml" ]; then
+              echo "Auditing $pkg_dir"
+              cd "$pkg_dir"
+              uv sync --all-extras
+              uv run pip-audit --skip-editable || true
+              cd -
+            fi
+          done
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo-audit
+        run: cargo audit
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-results.sarif
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 5: Container Build & Scan
+  # ─────────────────────────────────────────────────────────────
+  container-build:
+    name: Container Build
+    runs-on: ubuntu-latest
+    needs: [python-ci, rust-ci, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    strategy:
+      matrix:
+        include:
+          - service: service-framework-core
+            dockerfile: infra/docker/dockerfiles/Dockerfile.service-framework
+            context: .
+          - service: api-gateway
+            dockerfile: infra/docker/dockerfiles/Dockerfile.api-gateway
+            context: .
+          - service: auth-core
+            dockerfile: infra/docker/dockerfiles/Dockerfile.auth-core
+            context: .
+          - service: audit-core
+            dockerfile: infra/docker/dockerfiles/Dockerfile.audit-core
+            context: .
+          - service: logging-core
+            dockerfile: infra/docker/dockerfiles/Dockerfile.logging-core
+            context: .
+          - service: tracing-core
+            dockerfile: infra/docker/dockerfiles/Dockerfile.tracing-core
+            context: .
+          - service: event-bus-verifier
+            dockerfile: infra/docker/dockerfiles/Dockerfile.event-bus-verifier
+            context: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build container image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-image-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.service }}.spdx.json
+
+      - name: Push container image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign container image
+        run: |
+          cosign sign --yes \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}:${{ github.sha }}
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service }}
+          path: sbom-${{ matrix.service }}.spdx.json
+          retention-days: 90
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 6: Integration Tests
+  # ─────────────────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: container-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: apex
+          POSTGRES_PASSWORD: apex
+          POSTGRES_DB: apexquant_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U apex"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+      redpanda:
+        image: redpandadata/redpanda:v24.2.1
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd "rpk cluster health"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run integration test suite
+        env:
+          DATABASE_URL: postgres://apex:apex@localhost:5432/apexquant_test
+          REDIS_URL: redis://localhost:6379
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          APEX_ENVIRONMENT: sandbox
+        run: |
+          cd tests/integration
+          uv sync --all-extras
+          uv run pytest --tb=short -q
+
+      - name: Run Docker Compose smoke test
+        run: |
+          docker compose \
+            -f infra/docker/compose/local/docker-compose.yaml \
+            -f infra/docker/compose/local/docker-compose.override.yaml \
+            up -d --build
+
+          sleep 30
+
+          curl -sf http://localhost:8080/healthz || exit 1
+          curl -sf http://localhost:8085/healthz || exit 1
+          curl -sf http://localhost:8086/healthz || exit 1
+
+          docker compose \
+            -f infra/docker/compose/local/docker-compose.yaml \
+            -f infra/docker/compose/local/docker-compose.override.yaml \
+            down
+
+  # ─────────────────────────────────────────────────────────────
+  # Stage 7: Deployment Gate Summary
+  # ─────────────────────────────────────────────────────────────
+  deployment-gate:
+    name: Deployment Gate
+    runs-on: ubuntu-latest
+    needs: [python-ci, rust-ci, security-scan, container-build, integration-tests]
+    if: always()
+
+    steps:
+      - name: Evaluate gate conditions
+        run: |
+          echo "=== CI/CD Deployment Gate ==="
+          echo "Python CI: ${{ needs.python-ci.result }}"
+          echo "Rust CI: ${{ needs.rust-ci.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+          echo "Container Build: ${{ needs.container-build.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
+
+          if [ "${{ needs.python-ci.result }}" != "success" ]; then
+            echo "BLOCKED: Python CI failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.rust-ci.result }}" != "success" ]; then
+            echo "BLOCKED: Rust CI failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.security-scan.result }}" != "success" ]; then
+            echo "BLOCKED: Security scan failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.container-build.result }}" != "success" ]; then
+            echo "BLOCKED: Container build failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "BLOCKED: Integration tests failed"
+            exit 1
+          fi
+
+          echo "GATE PASSED: All conditions met"

@@ -1,0 +1,41 @@
+name: Metrics Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  python-metrics-tests:
+    name: Python Metrics Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run metrics tests
+        run: |
+          cd python/apexquant-metrics
+          uv sync --all-extras
+          uv run pytest
+
+  rust-metrics-tests:
+    name: Rust Metrics Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Run apex-metrics tests
+        run: cargo test --package apex-metrics

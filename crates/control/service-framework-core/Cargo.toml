@@ -1,0 +1,33 @@
+[package]
+name = "service-framework-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "service_framework_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "apex-service-framework"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+tonic = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+axum = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+prometheus = { workspace = true }
+chrono = { workspace = true }
+
+[build-dependencies]
+tonic-build = { workspace = true }

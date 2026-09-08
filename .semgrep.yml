@@ -1,0 +1,40 @@
+rules:
+  - id: apex-no-hardcoded-secrets
+    pattern-either:
+      - pattern: password = "..."
+      - pattern: api_key = "..."
+      - pattern: secret = "..."
+      - pattern: token = "..."
+    message: "Hardcoded secret detected. Use environment variables or secrets manager."
+    languages: [python]
+    severity: ERROR
+
+  - id: apex-no-sql-injection
+    pattern-either:
+      - pattern: conn.execute(f"... {$VAR} ...")
+      - pattern: cursor.execute(f"... {$VAR} ...")
+    message: "Potential SQL injection. Use parameterized queries."
+    languages: [python]
+    severity: ERROR
+
+  - id: apex-no-eval
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+    message: "Use of eval/exec is forbidden."
+    languages: [python]
+    severity: ERROR
+
+  - id: apex-no-unsafe-yaml
+    pattern: yaml.load($DATA)
+    message: "Use yaml.safe_load() instead of yaml.load()."
+    languages: [python]
+    severity: WARNING
+
+  - id: apex-no-debug-in-production
+    pattern-either:
+      - pattern: breakpoint()
+      - pattern: pdb.set_trace()
+    message: "Debug statement detected. Remove before production."
+    languages: [python]
+    severity: WARNING

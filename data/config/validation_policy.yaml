@@ -1,0 +1,50 @@
+version: 1
+
+secret_key_markers:
+  - password
+  - secret
+  - token
+  - api_key
+  - apikey
+  - private_key
+  - credential
+  - access_key
+
+allowed_secret_reference_prefixes:
+  - "env://"
+  - "vault://"
+  - "secret://"
+
+environments:
+  - local
+  - sandbox
+  - paper
+  - shadow
+  - production
+
+planes:
+  - CONTROL
+  - MARKET_DATA
+  - TRADING
+  - RISK
+  - AI
+  - DATA_RESEARCH
+  - OBSERVABILITY
+
+fail_closed_policies:
+  - READ_ONLY
+  - CANCEL_OPEN_ORDERS
+  - HALT_TRADING
+  - SHUTDOWN
+
+trading_mode_by_environment:
+  local: DEVELOPMENT
+  sandbox: SANDBOX
+  paper: PAPER
+  shadow: SHADOW
+  production: PRODUCTION
+
+require_fail_closed_for:
+  - paper
+  - shadow
+  - production

@@ -1,0 +1,41 @@
+name: Distributed Tracing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  python-tracing-tests:
+    name: Python Tracing Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Run tracing tests
+        run: |
+          cd python/apexquant-tracing
+          uv sync --all-extras
+          uv run pytest
+
+  rust-tracing-tests:
+    name: Rust Tracing Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Run apex-tracing tests
+        run: cargo test --package apex-tracing

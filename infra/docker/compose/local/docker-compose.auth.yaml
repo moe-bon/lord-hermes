@@ -1,0 +1,57 @@
+services:
+  auth-core:
+    build:
+      context: ../../../../
+      dockerfile: infra/docker/dockerfiles/Dockerfile.auth-core
+    image: ${AUTH_CORE_IMAGE:-apexquant/auth-core}:${AUTH_CORE_VERSION:-0.11.0}
+    environment:
+      APEX_HTTP_ADDR: 0.0.0.0:8086
+      APEX_AUTH_DATABASE_URL: postgres://${POSTGRES_USER:-apex}:${POSTGRES_PASSWORD:-apex}@postgres:5432/${POSTGRES_DB:-apexquant}
+      APEX_AUTH_TOKEN_SECRET: ${APEX_AUTH_TOKEN_SECRET:?APEX_AUTH_TOKEN_SECRET must be set}
+      APEX_AUTH_BOOTSTRAP_CLIENT_ID: ${APEX_AUTH_BOOTSTRAP_CLIENT_ID:-bootstrap-admin}
+      APEX_AUTH_BOOTSTRAP_API_KEY: ${APEX_AUTH_BOOTSTRAP_API_KEY:?APEX_AUTH_BOOTSTRAP_API_KEY must be set}
+      APEX_AUTH_BOOTSTRAP_PERMISSIONS: ${APEX_AUTH_BOOTSTRAP_PERMISSIONS:-*}
+      APEX_AUTH_MIGRATIONS_DIR: /migrations/postgres/auth
+    ports:
+      - "8086:8086"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: "10001"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    labels:
+      apexquant.managed: "true"
+      apexquant.service.name: auth-core
+      apexquant.service.plane: CONTROL
+      apexquant.environment: ${APEX_ENVIRONMENT:-local}
+      apexquant.feature: "0.11"
+      apexquant.version: ${AUTH_CORE_VERSION:-0.11.0}
+      apexquant.fail_closed_policy: SHUTDOWN
+    networks:
+      - platform
+      - data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8086/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+
+  api-gateway:
+    environment:
+      APEX_GATEWAY_AUTH_MODE: ${APEX_GATEWAY_AUTH_MODE:-permissive}
+      APEX_AUTH_TOKEN_SECRET: ${APEX_AUTH_TOKEN_SECRET:?APEX_AUTH_TOKEN_SECRET must be set}
+    depends_on:
+      auth-core:
+        condition: service_healthy

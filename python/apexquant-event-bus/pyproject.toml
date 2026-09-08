@@ -1,0 +1,37 @@
+[project]
+name = "apexquant-event-bus"
+version = "0.8.0"
+description = "ApexQuant Ultra event bus and message infrastructure foundation"
+requires-python = ">=3.13"
+dependencies = [
+    "aiokafka>=0.10",
+    "pydantic>=2.8",
+    "psycopg[binary]>=3.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.11",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+apexquant-event-bus = "apexquant_event_bus.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apexquant_event_bus"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+

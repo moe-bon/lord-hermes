@@ -1,0 +1,15 @@
+FROM rust:1.85-bookworm AS builder
+WORKDIR /workspace
+COPY crates/market-data/apex-md-registry ./apex-md-registry
+COPY migrations ./migrations
+WORKDIR /workspace/apex-md-registry
+# Compile with maximum optimizations for the VPS
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# Non-root user for security
+RUN useradd -m -u 10001 apex
+USER apex
+COPY --from=builder /workspace/apex-md-registry/target/release/apex-md-registry /usr/local/bin/
+CMD ["/usr/local/bin/apex-md-registry"]
